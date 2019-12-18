@@ -124,6 +124,8 @@ class YoloTrain(object):
 
     def train(self):
         self.sess.run(tf.global_variables_initializer())
+        # restoring previous weights for transfer learning
+        # still runable without previous weights
         try:
             print('=> Restoring weights from: %s ... ' % self.initial_weight)
             self.loader.restore(self.sess, self.initial_weight)
@@ -132,15 +134,21 @@ class YoloTrain(object):
             print('=> Now it starts to train YOLOV3 from scratch ...')
             self.first_stage_epochs = 0
 
+        # Loop through epochs
         for epoch in range(1, 1+self.first_stage_epochs+self.second_stage_epochs):
+            # first stage: train with frozen weights
             if epoch <= self.first_stage_epochs:
                 train_op = self.train_op_with_frozen_variables
             else:
+                # second stage: train all weights
                 train_op = self.train_op_with_all_variables
 
+            # progress bar
             pbar = tqdm(self.trainset)
+            # container for loss
             train_epoch_loss, test_epoch_loss = [], []
 
+            # whole training sequence
             for train_data in pbar:
                 _, summary, train_step_loss, global_step_val = self.sess.run(
                     [train_op, self.write_op, self.loss, self.global_step],feed_dict={
@@ -158,6 +166,7 @@ class YoloTrain(object):
                 self.summary_writer.add_summary(summary, global_step_val)
                 pbar.set_description("train loss: %.2f" %train_step_loss)
 
+            # then test
             for test_data in self.testset:
                 test_step_loss = self.sess.run( self.loss, feed_dict={
                                                 self.input_data:   test_data[0],

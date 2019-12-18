@@ -32,11 +32,13 @@ class YOLOV3(object):
         self.iou_loss_thresh  = cfg.YOLO.IOU_LOSS_THRESH
         self.upsample_method  = cfg.YOLO.UPSAMPLE_METHOD
 
+        # build network
         try:
             self.conv_lbbox, self.conv_mbbox, self.conv_sbbox = self.__build_nework(input_data)
         except:
             raise NotImplementedError("Can not build up yolov3 network!")
 
+        
         with tf.variable_scope('pred_sbbox'):
             self.pred_sbbox = self.decode(self.conv_sbbox, self.anchors[0], self.strides[0])
 
@@ -107,11 +109,31 @@ class YOLOV3(object):
 
         conv_output = tf.reshape(conv_output, (batch_size, output_size, output_size, anchor_per_scale, 5 + self.num_class))
 
+        # all batch, all x, all y, all anchors, first to second element (corresponds to x, y of bbox)
         conv_raw_dxdy = conv_output[:, :, :, :, 0:2]
+        # all batch, all x, all y, all anchors, third to fourth element (corresponds to w, h of bbox)
         conv_raw_dwdh = conv_output[:, :, :, :, 2:4]
+        # all batch, all x, all y, all anchors, fifth element (corresponds to objectness/score of bbox)
         conv_raw_conf = conv_output[:, :, :, :, 4:5]
+        # all batch, all x, all y, all anchors, sixth element onwards (corresponds to all class prob of bbox)
         conv_raw_prob = conv_output[:, :, :, :, 5: ]
 
+        # create 2d matrix, y
+        #[[ 0  0  0 ...  0  0  0]
+        # [ 1  1  1 ...  1  1  1]
+        # [ 2  2  2 ...  2  2  2]
+        # ...
+        # [29 29 29 ... 29 29 29]
+        # [30 30 30 ... 30 30 30]
+        # [31 31 31 ... 31 31 31]]
+        # x
+        # [[ 0  1  2 ... 29 30 31]
+        # [ 0  1  2 ... 29 30 31]
+        # [ 0  1  2 ... 29 30 31]
+        # ...
+        # [ 0  1  2 ... 29 30 31]
+        # [ 0  1  2 ... 29 30 31]
+        # [ 0  1  2 ... 29 30 31]]
         y = tf.tile(tf.range(output_size, dtype=tf.int32)[:, tf.newaxis], [1, output_size])
         x = tf.tile(tf.range(output_size, dtype=tf.int32)[tf.newaxis, :], [output_size, 1])
 
